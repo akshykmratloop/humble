@@ -55,25 +55,21 @@ candidates = Profile
 ## 4. Matching module
 
 **Services**: `DecisionService.submit(deciderId, targetId, decision)`, `MatchService` (internal, invoked by DecisionService).
-**Core transaction** (serializable isolation):
+**Core flow** (as implemented — see "Concurrency" below for why this is correct without an explicit `FOR UPDATE`/serializable transaction):
 
 ```
-BEGIN
-  UPSERT DiscoveryDecision(deciderId, targetId, decision) -- idempotent on conflict, no-op if same value
-  SELECT reverse DiscoveryDecision(targetId, deciderId) FOR UPDATE
-  IF reverse exists AND reverse.decision == decision:
-     matchType = (decision == LIKE) ? NORMAL : HUMBLE
-     IF matchType == HUMBLE AND (self.pref.humbleMatchOptOut OR target.pref.humbleMatchOptOut):
-        -- no match created; treated as two independent decisions
-     ELSE:
-        INSERT Match(...) ON CONFLICT (pair) DO NOTHING -- guards the race case
-        EMIT MutualLikeDetected | MutualRejectDetected, MatchCreated | HumbleMatchCreated
-COMMIT
+INSERT DiscoveryDecision(deciderId, targetId, decision)  -- own row first; unique-constraint conflict = idempotent no-op, return early
+SELECT reverse DiscoveryDecision(targetId, deciderId)
+IF reverse exists:
+   matchType = evaluateMatchOutcome(decision, reverse.decision, optOutFlags)  -- packages/domain/match.js, pure function
+   IF matchType:
+      INSERT Match(...) ON CONFLICT (pair) DO NOTHING -- guards the double-fire case
+RETURN current Match for the pair (if any), regardless of which branch above ran
 ```
 
 **Authorization**: `deciderId` is always the session user; `targetId` must be a currently-valid candidate for that user (re-validated server-side against the same exclusion rules as Discovery, not trusted from the request body) to prevent deciding on a blocked/ineligible profile via a crafted request.
 **Idempotency**: re-submitting the same decision is a no-op; submitting the _opposite_ decision after an initial one is currently disallowed for MVP (a decision is final) — documented as a product decision, revisit if user feedback demands "undo."
-**Concurrency**: the `FOR UPDATE` row lock + unique constraint on `Match(leastId, greatestId)` prevents double-match creation when both users decide near-simultaneously.
+**Concurrency**: implemented without a `FOR UPDATE` lock or serializable transaction. Because each request inserts its _own_ decision row before reading for the _other's_, "my insert" always happens-before "my read" within a single request — which makes it impossible for two concurrent, opposite requests to both miss each other's row (whichever commits second is guaranteed to observe the first's already-committed insert when it reads). At-least-one-request-detects-the-match is therefore guaranteed; at-most-one-Match-persists is guaranteed separately by the unique constraint on `Match(userLowId, userHighId)`, with the losing insert's conflict treated as a no-op. See `apps/api/src/modules/matching/matching.service.js` for the concrete implementation and this same reasoning restated in code.
 **ConversationPolicy** (config, not hard-coded): a `PolicyResolver` service determines initiation permission per match; MVP ships one default policy (either party may send the first message, 7-day initiation window) to avoid over-building the gendered-policy configurability before it's validated as needed — the entity model supports richer policies (see FR-09) without requiring MVP to use them.
 
 ## 5. Messaging module

@@ -7,6 +7,8 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { MatchingModule } from './modules/matching/matching.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     AuthModule,
     ProfilesModule,
     UploadsModule,
+    DiscoveryModule,
+    MatchingModule,
   ],
 })
 export class AppModule {

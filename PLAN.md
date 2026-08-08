@@ -4,7 +4,7 @@ This is the living architecture + decisions log entry point. Full documents live
 
 ## Current phase
 
-**Phase 14 — MVP vertical slices.** Phase 13 (Foundation) and Slices 1–2 (Auth, Profile) are implemented and verified (tests green, exercised live via curl and the browser). Next: Slice 3 (Discovery).
+**Phase 14 — MVP vertical slices.** Phase 13 (Foundation) and Slices 1–4 (Auth, Profile, Discovery, Matching — including the Humble Match mechanic) are implemented and verified (44 automated tests green, both match types exercised live end-to-end in the browser). Next: Slice 5 (Messaging).
 
 ## Document map
 

@@ -33,4 +33,25 @@ export const api = {
   session: () => apiRequest('/v1/auth/session'),
   getOwnProfile: () => apiRequest('/v1/profiles/me'),
   updateOwnProfile: (payload) => apiRequest('/v1/profiles/me', { method: 'PATCH', body: payload }),
+  getCandidates: (cursor) =>
+    apiRequest(`/v1/discovery/candidates${cursor ? `?cursor=${cursor}` : ''}`),
+  submitDecision: (targetId, decision) =>
+    apiRequest('/v1/discovery/decisions', { method: 'POST', body: { targetId, decision } }),
+  getMatches: () => apiRequest('/v1/matches'),
+  requestPhotoUploadUrl: () => apiRequest('/v1/profiles/me/photos/upload-url', { method: 'POST' }),
+  confirmPhotoUpload: (photoId) =>
+    apiRequest(`/v1/profiles/me/photos/${photoId}/confirm`, { method: 'POST' }),
 };
+
+/** Raw-body PUT for the two-step photo upload — bypasses apiRequest's JSON encoding. */
+export async function uploadPhotoBytes(uploadUrl, file) {
+  const res = await fetch(`${API_BASE_URL}${uploadUrl}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  if (!res.ok) {
+    throw new Error(`Photo upload failed with status ${res.status}`);
+  }
+}

@@ -3,15 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '../../components/Button';
 import { TextField } from '../../components/TextField';
-import { api } from '../../lib/api';
+import { api, uploadPhotoBytes } from '../../lib/api';
+import { photoUrl } from '../../lib/media';
 
 export default function MePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [serverError, setServerError] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const {
     register,
     handleSubmit,
@@ -45,6 +48,24 @@ export default function MePage() {
     }
   }
 
+  async function onPhotoSelected(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setServerError(null);
+    setUploadingPhoto(true);
+    try {
+      const { photoId, uploadUrl } = await api.requestPhotoUploadUrl();
+      await uploadPhotoBytes(uploadUrl, file);
+      await api.confirmPhotoUpload(photoId);
+      setProfile(await api.getOwnProfile());
+    } catch (err) {
+      setServerError(err.body?.detail || err.message);
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  }
+
   if (loading) {
     return (
       <main className="flex h-full items-center justify-center">
@@ -56,12 +77,18 @@ export default function MePage() {
   return (
     <main className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 overflow-y-auto px-6 py-12">
       {profile?.isComplete ? (
-        <div className="flex flex-col gap-2 text-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          {profile.photos?.[0] && (
+            <img
+              src={photoUrl(profile.photos[0].s3Key)}
+              alt={profile.name}
+              className="h-24 w-24 rounded-full object-cover"
+            />
+          )}
           <h1 className="text-2xl font-bold">You&apos;re all set, {profile.name}</h1>
-          <p className="text-body text-muted">
-            Discovery, matching, and the rest of the game layer ship in the next build slices — see
-            TASKS.md.
-          </p>
+          <Link href="/discovery" className="w-full">
+            <Button className="w-full">Start discovering</Button>
+          </Link>
         </div>
       ) : (
         <>
@@ -95,6 +122,33 @@ export default function MePage() {
               </select>
             </div>
             <TextField id="bio" label="Bio" defaultValue={profile?.bio} {...register('bio')} />
+
+            <div className="flex flex-col gap-2">
+              <span className="text-body-sm font-medium">Photo</span>
+              {profile?.photos?.[0] ? (
+                <img
+                  src={photoUrl(profile.photos[0].s3Key)}
+                  alt="Your profile"
+                  className="h-24 w-24 rounded-md object-cover"
+                />
+              ) : (
+                <label
+                  htmlFor="photo"
+                  className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-md border border-dashed border-black/20 text-body-sm text-muted"
+                >
+                  {uploadingPhoto ? 'Uploading…' : 'Add photo'}
+                </label>
+              )}
+              <input
+                id="photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={uploadingPhoto}
+                onChange={onPhotoSelected}
+              />
+            </div>
+
             {serverError && (
               <p role="alert" className="text-body-sm text-warning">
                 {serverError}
@@ -103,9 +157,6 @@ export default function MePage() {
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? 'Saving…' : 'Save profile'}
             </Button>
-            <p className="text-center text-body-sm text-muted">
-              Photo upload UI ships alongside the Discovery slice.
-            </p>
           </form>
         </>
       )}
