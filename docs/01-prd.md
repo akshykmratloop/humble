@@ -94,16 +94,17 @@ Each feature below specifies purpose, actor(s), preconditions, flow, success/fai
 **Actor**: User A on candidate B.
 **Preconditions**: B is a valid current candidate for A.
 **Flow**: A submits `LIKE` or `REJECT` for B. Server records `DiscoveryDecision(A→B)`. Server checks for B's prior decision on A:
-  - If none yet: no match, decision stored, A moves to next candidate.
-  - If B→A = `LIKE` and A→B = `LIKE`: **Normal Match** created (FR-05).
-  - If B→A = `REJECT` and A→B = `REJECT`: **Humble Match** created (FR-06).
-  - If decisions disagree (one like, one reject, in either order): no match; no notification to either party (rejection has dignity — product principle #2).
-**Success**: Decision persisted idempotently (unique constraint on `(deciderId, targetId)`); match created if applicable.
-**Failure**: Duplicate decision on same candidate is a no-op (idempotent), not an error.
-**Edge cases**: A and B decide within the same millisecond (race) — handled via DB unique constraint + transaction, second writer's transaction detects the first's row and proceeds to match-creation logic rather than erroring.
-**Abuse cases**: Rapid-fire scripted decisions (rate limit per minute; velocity anomaly feeds fraud/risk score, also gates Kill Streak eligibility per ADR-0003).
-**Analytics**: `LikeCreated`, `RejectCreated`, `MutualLikeDetected`, `MutualRejectDetected`.
-**Acceptance criteria**: Match creation is atomic and server-only; client never receives a "match" state it manufactured itself — it always comes from the decision-submission response or a subsequent fetch.
+
+- If none yet: no match, decision stored, A moves to next candidate.
+- If B→A = `LIKE` and A→B = `LIKE`: **Normal Match** created (FR-05).
+- If B→A = `REJECT` and A→B = `REJECT`: **Humble Match** created (FR-06).
+- If decisions disagree (one like, one reject, in either order): no match; no notification to either party (rejection has dignity — product principle #2).
+  **Success**: Decision persisted idempotently (unique constraint on `(deciderId, targetId)`); match created if applicable.
+  **Failure**: Duplicate decision on same candidate is a no-op (idempotent), not an error.
+  **Edge cases**: A and B decide within the same millisecond (race) — handled via DB unique constraint + transaction, second writer's transaction detects the first's row and proceeds to match-creation logic rather than erroring.
+  **Abuse cases**: Rapid-fire scripted decisions (rate limit per minute; velocity anomaly feeds fraud/risk score, also gates Kill Streak eligibility per ADR-0003).
+  **Analytics**: `LikeCreated`, `RejectCreated`, `MutualLikeDetected`, `MutualRejectDetected`.
+  **Acceptance criteria**: Match creation is atomic and server-only; client never receives a "match" state it manufactured itself — it always comes from the decision-submission response or a subsequent fetch.
 
 ---
 
@@ -127,7 +128,7 @@ Each feature below specifies purpose, actor(s), preconditions, flow, success/fai
 
 ---
 
-### FR-07 Super Reject *(Post-MVP, safe-redesigned per ADR-0002)*
+### FR-07 Super Reject _(Post-MVP, safe-redesigned per ADR-0002)_
 
 **Purpose**: Dramatized, scarce version of Reject for the sender's own experience.
 **Flow**: User consumes 1 Super Reject charge (regenerates over time / earnable) instead of a normal Reject. Functionally identical to Reject server-side (permanent mutual discovery exclusion) plus sender-only VFX/copy. No effect on recipient's account, visibility to others, or app access.
@@ -137,7 +138,7 @@ Each feature below specifies purpose, actor(s), preconditions, flow, success/fai
 
 ---
 
-### FR-08 Shields *(Post-MVP, redesigned per ADR-0002)*
+### FR-08 Shields _(Post-MVP, redesigned per ADR-0002)_
 
 **Purpose**: Positive consumable currency.
 **Flow**: Acquired via purchase (Stripe) or free-earn (streak milestones, daily engagement). Consuming one at decision-time: suppresses "you got rejected" signaling (already suppressed by default per product principle #2 — so in practice this maps to reserving one for streak insurance) and/or protects a Kill Streak increment from reversal (ADR-0003).
@@ -159,28 +160,28 @@ Each feature below specifies purpose, actor(s), preconditions, flow, success/fai
 
 ---
 
-### FR-10 Kill Streak *(MVP — see ADR-0003 for full state machine)*
+### FR-10 Kill Streak _(MVP — see ADR-0003 for full state machine)_
 
 **Purpose**: Reward consecutive engagement with the core loop.
 **Acceptance criteria**: Streak count only increases via server-confirmed qualifying matches; farming via unmatch-spam or multi-accounting is neutralized by the grace-window + risk-cluster checks (verified by dedicated abuse-simulation tests).
 
 ---
 
-### FR-11 Power-Ups *(Post-MVP)*
+### FR-11 Power-Ups _(Post-MVP)_
 
 **Purpose**: Explicit gameplay reward domain (Shield, Boost, Streak Multiplier, Spotlight, Match Reveal).
 **Acceptance criteria**: Modeled as `PowerUp`/`InventoryItem`/`Entitlement` entities (never scattered flags); every consumption is a server-side transaction with an audit trail.
 
 ---
 
-### FR-12 Berserker Mode *(Post-MVP — see ADR-0004)*
+### FR-12 Berserker Mode _(Post-MVP — see ADR-0004)_
 
 **Purpose**: Paid visibility + initiation-permission boost.
 **Acceptance criteria**: Block/Report unconditionally override Berserker state (INV-1/INV-2); no immunity of any kind.
 
 ---
 
-### FR-13 Profile Takeover Challenge *(Post-MVP — see ADR-0005)*
+### FR-13 Profile Takeover Challenge _(Post-MVP — see ADR-0005)_
 
 **Purpose**: Safe, sandboxed comedic mechanic.
 **Acceptance criteria**: Zero write access to the real `Profile` entity; curated content only; instantly dismissible by the affected user.
@@ -200,12 +201,12 @@ Each feature below specifies purpose, actor(s), preconditions, flow, success/fai
 
 **Purpose**: Absolute, unconditional path into moderation.
 **Flow**: User reports another with a category (harassment, fake profile, inappropriate content, spam, safety concern, other) + optional evidence (message IDs, photo IDs, free-text). Creates `ModerationCase(status=OPEN)`. Reporting a user does not itself block them (separate, additive action) but the UI always offers both together.
-**Acceptance criteria**: INV-2 — no feature can prevent, mute, or auto-dismiss a report. Reports always enter the moderation queue; automation may only *prioritize*, never *discard*.
+**Acceptance criteria**: INV-2 — no feature can prevent, mute, or auto-dismiss a report. Reports always enter the moderation queue; automation may only _prioritize_, never _discard_.
 **Analytics**: `UserReported`, `ModerationCaseCreated`.
 
 ---
 
-### FR-16 Payments & Entitlements *(Post-MVP for Shields/Berserker; architecture designed at MVP time)*
+### FR-16 Payments & Entitlements _(Post-MVP for Shields/Berserker; architecture designed at MVP time)_
 
 **Purpose**: Real financial subsystem, never client-trusted.
 **Flow**: Client requests Stripe Checkout session → Stripe handles payment → Stripe webhook (signature-verified) → server verifies event authenticity + idempotency key → creates `Purchase` record → grants `Entitlement`/`InventoryItem`. Refunds/chargebacks processed via webhook → entitlement reconciliation (revoke unused portion where feasible, flag account if entitlement already consumed).

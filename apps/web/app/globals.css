@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fixed app shell (user global mandate): the document itself never scrolls —
+   only a designated inner region does. min-height:100vh on a shell that wraps
+   a scroll area is the #1 cause of the whole-window-drifts bug; use height, not
+   min-height, everywhere below. */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#__next,
+.app-shell-root {
+  height: 100%;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -2,19 +2,19 @@
 
 ## 1. Bounded contexts (map to NestJS modules, ADR-0001)
 
-| Context | Owns | Depends on |
-|---|---|---|
-| Identity & Access (`auth`) | User credentials, sessions | — |
-| Profile (`profiles`) | Profile, ProfilePhoto, Preference | Identity |
-| Discovery (`discovery`) | DiscoveryDecision, candidate ranking | Profile, Safety (block filtering) |
-| Matching (`matching`) | Match, ConversationPolicy | Discovery, Safety |
-| Messaging (`messaging`) | Conversation, Message | Matching, Safety |
-| Game (`game`) | KillStreak, PowerUp, InventoryItem, TakeoverBadge | Matching, Fraud/Risk |
-| Payments (`payments`) | Purchase, Entitlement | Identity, Game |
-| Safety (`safety`) | Block, Report, ModerationCase, AuditEvent, FraudRiskScore | Identity |
-| Notifications (`notifications`) | Notification, delivery preferences | all producers (event-driven) |
-| Analytics (`analytics`) | AnalyticsEvent sink | all producers (event-driven) |
-| Admin (`admin`) | Admin-facing composition of Safety/Payments/Game views | Safety, Payments, Game |
+| Context                         | Owns                                                      | Depends on                        |
+| ------------------------------- | --------------------------------------------------------- | --------------------------------- |
+| Identity & Access (`auth`)      | User credentials, sessions                                | —                                 |
+| Profile (`profiles`)            | Profile, ProfilePhoto, Preference                         | Identity                          |
+| Discovery (`discovery`)         | DiscoveryDecision, candidate ranking                      | Profile, Safety (block filtering) |
+| Matching (`matching`)           | Match, ConversationPolicy                                 | Discovery, Safety                 |
+| Messaging (`messaging`)         | Conversation, Message                                     | Matching, Safety                  |
+| Game (`game`)                   | KillStreak, PowerUp, InventoryItem, TakeoverBadge         | Matching, Fraud/Risk              |
+| Payments (`payments`)           | Purchase, Entitlement                                     | Identity, Game                    |
+| Safety (`safety`)               | Block, Report, ModerationCase, AuditEvent, FraudRiskScore | Identity                          |
+| Notifications (`notifications`) | Notification, delivery preferences                        | all producers (event-driven)      |
+| Analytics (`analytics`)         | AnalyticsEvent sink                                       | all producers (event-driven)      |
+| Admin (`admin`)                 | Admin-facing composition of Safety/Payments/Game views    | Safety, Payments, Game            |
 
 Module boundary rule: a module may only read/write another module's data through that module's public service interface — never a direct repository import across module lines. This is the concrete mechanism that keeps the monolith extractable later (ADR-0001).
 
@@ -36,11 +36,11 @@ Module boundary rule: a module may only read/write another module's data through
 - **FraudRiskScore** — userId, score, signals, updatedAt — consumed by Discovery (rate limiting), Game (streak eligibility), Auth (signup risk).
 - **KillStreak** — userId, count, status (PENDING increments tracked via StreakEvent), lastQualifyingAt.
 - **StreakEvent** — streakId, matchId, state (PENDING|CONFIRMED|REVERSED), graceExpiresAt.
-- **PowerUp** *(post-MVP)* — catalog entity (type, effect descriptor).
-- **InventoryItem** *(post-MVP)* — userId, powerUpId/shieldType, quantity.
-- **Entitlement** *(post-MVP)* — userId, type (BERSERKER, etc.), expiresAt, sourcePurchaseId.
-- **Purchase** *(post-MVP)* — userId, provider(Stripe), providerRef, amount, status, idempotencyKey.
-- **TakeoverBadge** *(post-MVP)* — curated content catalog entity; **never** references or writes Profile.
+- **PowerUp** _(post-MVP)_ — catalog entity (type, effect descriptor).
+- **InventoryItem** _(post-MVP)_ — userId, powerUpId/shieldType, quantity.
+- **Entitlement** _(post-MVP)_ — userId, type (BERSERKER, etc.), expiresAt, sourcePurchaseId.
+- **Purchase** _(post-MVP)_ — userId, provider(Stripe), providerRef, amount, status, idempotencyKey.
+- **TakeoverBadge** _(post-MVP)_ — curated content catalog entity; **never** references or writes Profile.
 - **Notification** — userId, type, payload, readAt.
 - **AnalyticsEvent** — name, actorId, entityRef, metadata, privacyClass, createdAt.
 

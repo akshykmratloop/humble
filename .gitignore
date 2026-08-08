@@ -27,3 +27,6 @@ yarn-error.log*
 
 # graphify local artifacts (per-machine)
 graphify-out/
+
+# local-disk dev stand-in for S3 uploads (apps/api/src/common/storage/storage.service.js)
+apps/api/uploads/

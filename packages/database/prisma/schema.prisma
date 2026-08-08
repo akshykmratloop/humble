@@ -1,0 +1,495 @@
+// Humble database schema — implements docs/07-database-design.md verbatim.
+// Deviations require updating that doc first (change-management rule, global CLAUDE.md §36).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Identity ----------
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DEACTIVATED
+  PENDING_DELETION
+  SUSPENDED
+  BANNED
+  DELETED
+}
+
+enum OAuthProvider {
+  GOOGLE
+}
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+  role            UserRole   @default(USER)
+  status          UserStatus @default(ACTIVE)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  oauthAccounts     OAuthAccount[]
+  authTokens        AuthToken[]
+  profile           Profile?
+  preference        Preference?
+  decisionsMade     DiscoveryDecision[]     @relation("DecisionsMade")
+  decisionsReceived DiscoveryDecision[]     @relation("DecisionsReceived")
+  blocksMade        Block[]                 @relation("BlocksMade")
+  blocksReceived    Block[]                 @relation("BlocksReceived")
+  reportsMade       Report[]                @relation("ReportsMade")
+  reportsReceived   Report[]                @relation("ReportsReceived")
+  auditEvents       AuditEvent[]
+  fraudRiskScore    FraudRiskScore?
+  killStreak        KillStreak?
+  notifications     Notification[]
+  messages          Message[]
+  moderationCases   ModerationCase[]        @relation("AssignedModerator")
+
+  @@index([status])
+}
+
+model OAuthAccount {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    OAuthProvider
+  providerUid String
+  createdAt   DateTime      @default(now())
+
+  @@unique([provider, providerUid])
+  @@index([userId])
+}
+
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model AuthToken {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AuthTokenType
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type])
+}
+
+// ---------- Profile ----------
+
+enum Gender {
+  MAN
+  WOMAN
+  NONBINARY
+  OTHER
+}
+
+enum GenderPreference {
+  MAN
+  WOMAN
+  NONBINARY
+  OTHER
+  ANY
+}
+
+model Profile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  birthdate  DateTime @db.Date
+  gender     Gender
+  bio        String?
+  cityLabel  String?
+  latBucket  Decimal? @db.Decimal(5, 2)
+  lngBucket  Decimal? @db.Decimal(5, 2)
+  isComplete Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  photos ProfilePhoto[]
+
+  @@index([isComplete])
+}
+
+enum PhotoModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProfilePhoto {
+  id               String                 @id @default(uuid())
+  profileId        String
+  profile          Profile                @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  s3Key            String
+  order            Int
+  moderationStatus PhotoModerationStatus  @default(PENDING)
+  createdAt        DateTime               @default(now())
+
+  @@unique([profileId, order])
+  @@index([profileId])
+}
+
+model Preference {
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  genderPreference  GenderPreference[]
+  ageMin            Int                @default(18)
+  ageMax            Int                @default(99)
+  maxDistanceKm     Int                @default(80)
+  humbleMatchOptOut Boolean            @default(false)
+  updatedAt         DateTime           @updatedAt
+}
+
+// ---------- Discovery & Matching ----------
+
+enum Decision {
+  LIKE
+  REJECT
+}
+
+model DiscoveryDecision {
+  id        String   @id @default(uuid())
+  deciderId String
+  decider   User     @relation("DecisionsMade", fields: [deciderId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    User     @relation("DecisionsReceived", fields: [targetId], references: [id], onDelete: Cascade)
+  decision  Decision
+  createdAt DateTime @default(now())
+
+  @@unique([deciderId, targetId])
+  @@index([targetId, decision])
+}
+
+enum MatchType {
+  NORMAL
+  HUMBLE
+}
+
+enum MatchStatus {
+  ACTIVE
+  EXPIRED
+  UNMATCHED
+  CLOSED
+}
+
+model Match {
+  id         String      @id @default(uuid())
+  userLowId  String
+  userHighId String
+  type       MatchType
+  status     MatchStatus @default(ACTIVE)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  conversation Conversation?
+  streakEvent  StreakEvent?
+
+  @@unique([userLowId, userHighId])
+  @@index([userLowId])
+  @@index([userHighId])
+  @@index([status])
+}
+
+enum InitiatorRule {
+  EITHER
+  POLICY_DESIGNATED_PARTY
+}
+
+model ConversationPolicy {
+  id                    String        @id @default(uuid())
+  matchType             MatchType     @unique
+  initiatorRule         InitiatorRule @default(EITHER)
+  initiationWindowHours Int           @default(168)
+}
+
+// ---------- Messaging ----------
+
+enum ConversationStatus {
+  AVAILABLE
+  STARTED
+  LOCKED
+}
+
+model Conversation {
+  id        String              @id @default(uuid())
+  matchId   String              @unique
+  match     Match               @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  status    ConversationStatus  @default(AVAILABLE)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  messages Message[]
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FLAGGED
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User          @relation(fields: [senderId], references: [id])
+  body           String        @db.VarChar(4000)
+  status         MessageStatus @default(SENT)
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ---------- Safety ----------
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+enum ReportCategory {
+  HARASSMENT
+  FAKE_PROFILE
+  INAPPROPRIATE_CONTENT
+  SPAM
+  SAFETY_CONCERN
+  OTHER
+}
+
+model Report {
+  id         String         @id @default(uuid())
+  reporterId String
+  reporter   User           @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedId String
+  reported   User           @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+  category   ReportCategory
+  details    String?
+  createdAt  DateTime       @default(now())
+
+  moderationCase ModerationCase?
+
+  @@index([reportedId])
+  @@index([reporterId])
+}
+
+enum ModerationCaseStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED_ACTIONED
+  RESOLVED_DISMISSED
+  APPEALED
+}
+
+model ModerationCase {
+  id                  String                @id @default(uuid())
+  reportId            String                @unique
+  report              Report                @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  status              ModerationCaseStatus  @default(OPEN)
+  assignedModeratorId String?
+  assignedModerator   User?                 @relation("AssignedModerator", fields: [assignedModeratorId], references: [id])
+  priorityScore       Int                   @default(0)
+  resolution          String?
+  resolvedAt          DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([status, priorityScore])
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId])
+}
+
+model FraudRiskScore {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score     Int      @default(0)
+  signals   Json?
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- Game (Kill Streak = MVP; rest is schema-only until its roadmap slice) ----------
+
+model KillStreak {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  confirmedCount   Int       @default(0)
+  lastQualifyingAt DateTime?
+  version          Int       @default(0)
+  updatedAt        DateTime  @updatedAt
+
+  streakEvents StreakEvent[]
+}
+
+enum StreakEventState {
+  PENDING
+  CONFIRMED
+  REVERSED
+}
+
+model StreakEvent {
+  id             String           @id @default(uuid())
+  streakId       String
+  streak         KillStreak       @relation(fields: [streakId], references: [id], onDelete: Cascade)
+  matchId        String           @unique
+  match          Match            @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  state          StreakEventState @default(PENDING)
+  graceExpiresAt DateTime
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([state, graceExpiresAt])
+}
+
+// Post-MVP game entities — schema fixed per docs/07-database-design.md §6, implemented in Slice 10+.
+
+model PowerUp {
+  id     String @id @default(uuid())
+  key    String @unique
+  name   String
+  effect Json
+
+  inventoryItems InventoryItem[]
+}
+
+model InventoryItem {
+  id        String  @id @default(uuid())
+  userId    String
+  powerUpId String
+  powerUp   PowerUp @relation(fields: [powerUpId], references: [id])
+  quantity  Int     @default(0)
+
+  @@unique([userId, powerUpId])
+}
+
+model TakeoverBadge {
+  id         String  @id @default(uuid())
+  label      String
+  flavorText String
+  isApproved Boolean @default(false)
+}
+
+// ---------- Payments — post-MVP, schema fixed per docs/07-database-design.md §7 ----------
+
+enum PaymentProvider {
+  STRIPE
+}
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+model Purchase {
+  id             String          @id @default(uuid())
+  userId         String
+  provider       PaymentProvider
+  providerRef    String
+  idempotencyKey String          @unique
+  amountCents    Int
+  currency       String          @db.Char(3)
+  status         PurchaseStatus  @default(PENDING)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  entitlements Entitlement[]
+}
+
+model ProcessedWebhookEvent {
+  id              String   @id @default(uuid())
+  providerEventId String   @unique
+  processedAt     DateTime @default(now())
+}
+
+enum EntitlementType {
+  BERSERKER
+}
+
+model Entitlement {
+  id               String          @id @default(uuid())
+  userId           String
+  type             EntitlementType
+  sourcePurchaseId String?
+  sourcePurchase   Purchase?       @relation(fields: [sourcePurchaseId], references: [id])
+  expiresAt        DateTime?
+  revokedAt        DateTime?
+
+  @@index([userId, type])
+}
+
+// ---------- Notifications & Analytics ----------
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+enum AnalyticsPrivacyClass {
+  NONE
+  PSEUDONYMOUS
+  PII
+}
+
+model AnalyticsEvent {
+  id           String                 @id @default(uuid())
+  name         String
+  actorId      String?
+  entityType   String?
+  entityId     String?
+  metadata     Json?
+  privacyClass AnalyticsPrivacyClass  @default(PSEUDONYMOUS)
+  createdAt    DateTime               @default(now())
+
+  @@index([name, createdAt])
+}

@@ -130,6 +130,7 @@ AWS
 ├── Route 53         — DNS
 └── CloudWatch       — logs/metrics/alerts
 ```
+
 Note: `apps/web` (Next.js) is well-suited to Vercel; `apps/api` (NestJS, stateful WebSocket) runs on ECS/Fargate. This split is a deployment-target decision, documented as ADR-0007 once infra work begins (Phase 13+), not before — avoid over-committing to infra before the app exists.
 
 ## 12. Why not microservices (cross-reference)

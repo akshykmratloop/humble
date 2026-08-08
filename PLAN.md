@@ -4,25 +4,25 @@ This is the living architecture + decisions log entry point. Full documents live
 
 ## Current phase
 
-**Phase 13 — Foundation implementation** (Slice 0 of `docs/11-implementation-roadmap.md`), following completed planning phases 0–12.
+**Phase 14 — MVP vertical slices.** Phase 13 (Foundation) and Slices 1–2 (Auth, Profile) are implemented and verified (tests green, exercised live via curl and the browser). Next: Slice 3 (Discovery).
 
 ## Document map
 
-| Doc | Covers |
-|---|---|
-| [docs/00-product-discovery.md](docs/00-product-discovery.md) | Vision, mechanic redesigns, risks, MVP proposal, North Star metric |
-| [docs/01-prd.md](docs/01-prd.md) | Full functional/non-functional requirements |
-| [docs/02-user-journeys-state-machines.md](docs/02-user-journeys-state-machines.md) | Journeys + state machines for every entity |
-| [docs/03-design-system.md](docs/03-design-system.md) | Brand, tokens, components, motion |
-| [docs/04-domain-model.md](docs/04-domain-model.md) | Bounded contexts, entities, events, aggregates |
-| [docs/05-hld.md](docs/05-hld.md) | High-level architecture |
-| [docs/06-lld.md](docs/06-lld.md) | Per-module low-level design |
-| [docs/07-database-design.md](docs/07-database-design.md) | Full schema |
-| [docs/08-api-contracts.md](docs/08-api-contracts.md) | REST/WS contracts |
-| [docs/09-threat-model.md](docs/09-threat-model.md) | Invariants, STRIDE, abuse mitigations |
-| [docs/10-testing-strategy.md](docs/10-testing-strategy.md) | Test layers, coverage targets, Visual QA loop |
-| [docs/11-implementation-roadmap.md](docs/11-implementation-roadmap.md) | Vertical slices, MVP done-gate |
-| [docs/adr/](docs/adr/) | Individual architecture decision records |
+| Doc                                                                                | Covers                                                             |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [docs/00-product-discovery.md](docs/00-product-discovery.md)                       | Vision, mechanic redesigns, risks, MVP proposal, North Star metric |
+| [docs/01-prd.md](docs/01-prd.md)                                                   | Full functional/non-functional requirements                        |
+| [docs/02-user-journeys-state-machines.md](docs/02-user-journeys-state-machines.md) | Journeys + state machines for every entity                         |
+| [docs/03-design-system.md](docs/03-design-system.md)                               | Brand, tokens, components, motion                                  |
+| [docs/04-domain-model.md](docs/04-domain-model.md)                                 | Bounded contexts, entities, events, aggregates                     |
+| [docs/05-hld.md](docs/05-hld.md)                                                   | High-level architecture                                            |
+| [docs/06-lld.md](docs/06-lld.md)                                                   | Per-module low-level design                                        |
+| [docs/07-database-design.md](docs/07-database-design.md)                           | Full schema                                                        |
+| [docs/08-api-contracts.md](docs/08-api-contracts.md)                               | REST/WS contracts                                                  |
+| [docs/09-threat-model.md](docs/09-threat-model.md)                                 | Invariants, STRIDE, abuse mitigations                              |
+| [docs/10-testing-strategy.md](docs/10-testing-strategy.md)                         | Test layers, coverage targets, Visual QA loop                      |
+| [docs/11-implementation-roadmap.md](docs/11-implementation-roadmap.md)             | Vertical slices, MVP done-gate                                     |
+| [docs/adr/](docs/adr/)                                                             | Individual architecture decision records                           |
 
 ## Service map (MVP)
 

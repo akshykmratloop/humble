@@ -26,6 +26,16 @@ OAuthAccount
   UNIQUE (provider, providerUid)
   INDEX (userId)
 
+AuthToken                              -- email verification + password reset (LLD §1)
+  id          uuid PK
+  userId      uuid FK -> User CASCADE
+  type        enum(EMAIL_VERIFICATION, PASSWORD_RESET)
+  tokenHash   text NOT NULL            -- raw token never stored, only its hash
+  expiresAt   timestamptz NOT NULL
+  usedAt      timestamptz NULL
+  createdAt
+  INDEX (userId, type)
+
 Session (Redis-primary; optional Postgres mirror for audit is out of scope for MVP)
 ```
 
@@ -205,7 +215,7 @@ TakeoverBadge                       -- post-MVP, curated content only, no FK to 
   isApproved   boolean DEFAULT false
 ```
 
-## 7. Payments *(post-MVP, schema fixed now)*
+## 7. Payments _(post-MVP, schema fixed now)_
 
 ```
 Purchase

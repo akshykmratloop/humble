@@ -10,7 +10,7 @@ Per global CLAUDE.md §5: three-layer test data (Migrations → Seeds → Factor
 - **Contract tests**: the generated OpenAPI spec is diffed in CI against the checked-in `openapi.yaml`; the web client's Zod schemas are generated from it — CI fails on drift (global CLAUDE.md §6).
 - **E2E** (Playwright, browser-driven): critical journeys — signup→profile→first swipe→match (both types)→message; block; report. Run against a fully-seeded local stack.
 - **Security tests**: authorization bypass attempts (cross-user object access), rate-limit enforcement, INV-1/INV-2 adversarial tests (buy Berserker → get blocked → assert 403), input-boundary fuzzing (XSS/SQLi payloads at every text field).
-- **Payment tests** *(post-MVP)*: webhook success/failure/duplicate-delivery/refund/chargeback, entitlement idempotency under replayed events.
+- **Payment tests** _(post-MVP)_: webhook success/failure/duplicate-delivery/refund/chargeback, entitlement idempotency under replayed events.
 - **Load tests** (k6 or Artillery, post-MVP once infra exists): discovery candidate query under concurrent load, matching race conditions under concurrent decision submission, messaging throughput.
 - **Failure-injection tests**: DB connection loss mid-transaction (must not leave partial state — verified via the transactional boundaries in LLD §4), Redis unavailable (session/rate-limit degrade gracefully, documented fallback behavior, never silently open the gate on rate limits), S3 upload failure (photo confirm step must not leave orphaned partial records).
 - **Regression**: every fixed production bug gets a named regression test before the fix is considered done (global CLAUDE.md §5).

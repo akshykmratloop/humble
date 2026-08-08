@@ -32,6 +32,7 @@ Conventions used throughout: JavaScript (no TypeScript) + Zod for runtime valida
 
 **Services**: `DiscoveryService.getCandidates(userId, cursor, limit)`.
 **Query composition** (all server-side, never client-filterable):
+
 ```
 candidates = Profile
   WHERE complete = true
@@ -45,6 +46,7 @@ candidates = Profile
   ORDER BY rankingScore DESC  -- MVP: recency + completeness heuristic, no ML
   LIMIT :limit
 ```
+
 **Authorization**: implicit — a user can only ever request their own candidate feed (`self` = session user).
 **Abuse controls**: per-session/per-account rate limit on candidate-fetch frequency; response DTO excludes raw coordinates (only a pre-bucketed distance label).
 **Events**: `ProfileViewed` (fired client-confirmed, i.e., when a card is actually rendered, batched to avoid a request per card).
@@ -54,6 +56,7 @@ candidates = Profile
 
 **Services**: `DecisionService.submit(deciderId, targetId, decision)`, `MatchService` (internal, invoked by DecisionService).
 **Core transaction** (serializable isolation):
+
 ```
 BEGIN
   UPSERT DiscoveryDecision(deciderId, targetId, decision) -- idempotent on conflict, no-op if same value
@@ -67,8 +70,9 @@ BEGIN
         EMIT MutualLikeDetected | MutualRejectDetected, MatchCreated | HumbleMatchCreated
 COMMIT
 ```
+
 **Authorization**: `deciderId` is always the session user; `targetId` must be a currently-valid candidate for that user (re-validated server-side against the same exclusion rules as Discovery, not trusted from the request body) to prevent deciding on a blocked/ineligible profile via a crafted request.
-**Idempotency**: re-submitting the same decision is a no-op; submitting the *opposite* decision after an initial one is currently disallowed for MVP (a decision is final) — documented as a product decision, revisit if user feedback demands "undo."
+**Idempotency**: re-submitting the same decision is a no-op; submitting the _opposite_ decision after an initial one is currently disallowed for MVP (a decision is final) — documented as a product decision, revisit if user feedback demands "undo."
 **Concurrency**: the `FOR UPDATE` row lock + unique constraint on `Match(leastId, greatestId)` prevents double-match creation when both users decide near-simultaneously.
 **ConversationPolicy** (config, not hard-coded): a `PolicyResolver` service determines initiation permission per match; MVP ships one default policy (either party may send the first message, 7-day initiation window) to avoid over-building the gendered-policy configurability before it's validated as needed — the entity model supports richer policies (see FR-09) without requiring MVP to use them.
 
@@ -77,6 +81,7 @@ COMMIT
 **Entities**: `Conversation`, `Message`.
 **Services**: `ConversationService`, `MessageService.send(senderId, conversationId, body)`, `ChatGateway` (Socket.IO).
 **Send-message flow** (order matters — this is the concrete implementation of INV-1):
+
 ```
 1. Load Conversation, verify sender is a participant (object-level authz)
 2. Check Block: is either participant blocking the other? -> if yes, 403, stop. ALWAYS FIRST.
@@ -88,13 +93,14 @@ COMMIT
 8. Emit MessageSent event (-> analytics, notification)
 9. Broadcast via Socket.IO to recipient if connected
 ```
+
 **Authorization**: object-level check in step 1 on every call, not just at the gateway-connection level.
 **Failure handling**: DB write failure → send fails, client sees error, no partial broadcast; broadcast failure (recipient socket errored) does not roll back the persisted message — delivery is at-least-once via the durable row, socket is best-effort real-time delivery only.
 
 ## 6. Safety module (Block / Report / Moderation / Fraud)
 
 **Services**: `BlockService.block(blockerId, blockedId)` / `.unblock(...)`, `ReportService.report(reporterId, reportedId, category, evidence)`, `ModerationService` (admin-facing case management), `FraudRiskService.scoreEvent(...)`.
-**BlockService.block()`: single transaction — insert `Block` row, close any active `Conversation` between the pair (status → `Closed`), no exceptions, no feature flag can wrap this call in a conditional. This function is called directly (not via the event bus) from anywhere that needs to check blocking status, so there is no eventual-consistency window.
+**BlockService.block()`: single transaction — insert `Block`row, close any active`Conversation`between the pair (status →`Closed`), no exceptions, no feature flag can wrap this call in a conditional. This function is called directly (not via the event bus) from anywhere that needs to check blocking status, so there is no eventual-consistency window.
 **ReportService.report()`: single transaction — insert `Report`, insert `ModerationCase(status=OPEN)`, compute initial risk-priority score (heuristic: category severity + reporter/reported history) for queue ordering. Always succeeds if the two users exist; never conditionally rejected by any other module's state.
 **Authorization**: any authenticated user may block/report any other user they've interacted with (matched, or seen in discovery, or messaged); moderators/admins have elevated read/write on `ModerationCase`.
 **Audit**: every `ModerationService` state-changing method writes an `AuditEvent` (actorId, action, target, reason, timestamp) in the same transaction as the action — never as an afterthought/best-effort log line.
@@ -105,7 +111,7 @@ COMMIT
 **Concurrency**: streak increment/decrement is a single-row `UPDATE ... WHERE version = :expectedVersion` (optimistic locking) to avoid lost updates if a user's streak is touched by two events near-simultaneously (e.g., a match and a report resolving at the same time).
 **Failure handling**: the scheduled finalize job is idempotent (re-running it on already-finalized `StreakEvent` rows is a no-op) so a missed/duplicated cron run cannot double-count.
 
-## 8. Payments module *(post-MVP — architecture fixed now, implementation later)*
+## 8. Payments module _(post-MVP — architecture fixed now, implementation later)_
 
 **Services**: `CheckoutService.createSession(...)`, `WebhookService.handleStripeEvent(rawBody, signature)`, `EntitlementService.grant(...)`/`revoke(...)`.
 **Webhook handling**: verify signature → check `providerEventId` against a `ProcessedWebhookEvent` table (idempotency, since Stripe redelivers) → if new, process in a transaction that updates `Purchase` and grants `Entitlement`/`InventoryItem` atomically → mark event processed. A failure after "mark processed" but before "grant" is impossible because both happen in one transaction.
