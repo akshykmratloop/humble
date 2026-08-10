@@ -39,6 +39,10 @@ export default function MePage() {
 
   async function onSubmit(values) {
     setServerError(null);
+    if (!values.gender) {
+      setServerError('Please select a gender.');
+      return;
+    }
     try {
       const updated = await api.updateOwnProfile(values);
       setProfile(updated);
@@ -103,22 +107,33 @@ export default function MePage() {
               {...register('birthdate')}
             />
             <div className="flex flex-col gap-2">
-              <label htmlFor="gender" className="text-body-sm font-medium">
+              <label
+                htmlFor="gender"
+                className="text-body-sm font-medium text-ink dark:text-surface"
+              >
                 Gender
               </label>
               <select
                 id="gender"
                 defaultValue={profile?.gender || ''}
                 {...register('gender')}
-                className="h-12 rounded-sm border border-black/10 bg-surface px-4 text-base"
+                className="h-12 rounded-sm border border-black/10 bg-surface px-4 text-base text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-white/15 dark:bg-white/5 dark:text-surface"
               >
-                <option value="" disabled>
+                <option value="" disabled className="text-ink">
                   Select…
                 </option>
-                <option value="MAN">Man</option>
-                <option value="WOMAN">Woman</option>
-                <option value="NONBINARY">Non-binary</option>
-                <option value="OTHER">Other</option>
+                <option value="MAN" className="text-ink">
+                  Man
+                </option>
+                <option value="WOMAN" className="text-ink">
+                  Woman
+                </option>
+                <option value="NONBINARY" className="text-ink">
+                  Non-binary
+                </option>
+                <option value="OTHER" className="text-ink">
+                  Other
+                </option>
               </select>
             </div>
             <TextField id="bio" label="Bio" defaultValue={profile?.bio} {...register('bio')} />
